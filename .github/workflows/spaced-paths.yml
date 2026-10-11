@@ -31,10 +31,12 @@ jobs:
           cat before-output.log
           test "$status" -ne 0
           grep -F '0% tests passed, 4 tests failed out of 4' before-output.log
-          test "$(grep -Ec 'cannot open|is a directory' before-output.log)" -ge 4
+          test "$(grep -Ec '^Problem with ex_(output|log_output|xml_output|tap_output)' before-output.log)" -eq 4
           for script in test_output.sh test_log_output.sh test_xml_output.sh test_tap_output.sh; do
             git show HEAD:tests/$script > tests/$script
           done
           git diff --exit-code -- tests/test_output.sh tests/test_log_output.sh tests/test_xml_output.sh tests/test_tap_output.sh
+      - name: Verify fixed output tests pass
+        run: ctest --test-dir build -R '^test_(output|log_output|xml_output|tap_output)\.sh$' --output-on-failure
       - name: Run fixed full suite
         run: ctest --test-dir build --output-on-failure
