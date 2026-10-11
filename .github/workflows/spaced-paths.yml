@@ -1,0 +1,40 @@
+name: Spaced checkout verification
+
+on:
+  push:
+    branches: [codex/test-script-paths-ci]
+
+jobs:
+  linux-cmake:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: check with spaces
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: check with spaces
+          fetch-depth: 0
+      - name: Configure and build
+        run: |
+          cmake --version
+          gcc --version
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build -j2
+      - name: Verify original scripts fail
+        run: |
+          for script in test_output.sh test_log_output.sh test_xml_output.sh test_tap_output.sh; do
+            git show 35d9cc011faa0545bf56d5062ae90bbc2688eba7:tests/$script > tests/$script
+          done
+          status=0
+          ctest --test-dir build -R '^test_(output|log_output|xml_output|tap_output)\.sh$' --output-on-failure > before-output.log 2>&1 || status=$?
+          cat before-output.log
+          test "$status" -ne 0
+          grep -F '0% tests passed, 4 tests failed out of 4' before-output.log
+          test "$(grep -Ec 'cannot open|is a directory' before-output.log)" -ge 4
+          for script in test_output.sh test_log_output.sh test_xml_output.sh test_tap_output.sh; do
+            git show HEAD:tests/$script > tests/$script
+          done
+          git diff --exit-code -- tests/test_output.sh tests/test_log_output.sh tests/test_xml_output.sh tests/test_tap_output.sh
+      - name: Run fixed full suite
+        run: ctest --test-dir build --output-on-failure
